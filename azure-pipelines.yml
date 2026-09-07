@@ -1,13 +1,11 @@
 # ==============================================================================
-# Pipeline CI/CD Multi-Ambiente - Desafio DevOps Korp
+# Pipeline de CI (Build & Validação) - Desafio DevOps Korp
 # ==============================================================================
-# Segue o fluxo GitFlow:
-#  - Branch 'dev'     --> CI + Deploy Automático em ambiente DEV
-#  - Branch 'homolog' --> CI + Deploy Automático em ambiente HOMOLOG
-#  - Branch 'main'    --> CI + Deploy Automático em ambiente PROD
+# Escopo: Apenas Integração Contínua (CI)
+# O deploy (CD) é gerenciado pelas definições de Release no Azure DevOps.
 #
-# Utiliza Agent Pool hospedado da Microsoft: 'Azure Pipelines' (vmImage: 'ubuntu-latest')
-# Utiliza as bibliotecas seguras (Variable Groups): vg-testekorp-dev, vg-testekorp-homolog, vg-testekorp-prod
+# Gatilhos automáticos nas branches do GitFlow: dev, homolog e main.
+# Agente: Microsoft-hosted (ubuntu-latest).
 # ==============================================================================
 
 trigger:
@@ -17,138 +15,54 @@ trigger:
       - homolog
       - main
 
+pool:
+  vmImage: 'ubuntu-latest'
+
 stages:
-  # ============================================================================
-  # ESTÁGIO 1: CI (Continuous Integration) - Validação e Testes Unitários
-  # ============================================================================
-  - stage: CI
-    displayName: "CI - Build & Testes Unitários"
+  - stage: BuildAndTest
+    displayName: "CI - Build, Testes & Publicação de Artefatos"
     jobs:
-      - job: TestAndLint
-        displayName: "Testes Unitários em Go e Sintaxe Ansible"
-        pool:
-          vmImage: 'ubuntu-latest'
+      - job: CI_Job
+        displayName: "Validação Unitária e Empacotamento"
         steps:
+          # 1. Configurar versão do Go
           - task: GoTool@0
-            displayName: "Configurar Go 1.22"
+            displayName: "Instalar Golang 1.22"
             inputs:
               version: '1.22'
 
+          # 2. Executar Testes Unitários em Go
           - script: |
-              echo "==> Baixando dependências e executando testes unitários em Go..."
+              echo "==> Baixando dependências e rodando testes unitários..."
               cd app
               go mod download
               go test -v ./...
             displayName: "Executar testes unitários (Go)"
 
+          # 3. Validar sintaxe do Playbook Ansible
           - script: |
               echo "==> Validando sintaxe do Playbook Ansible..."
               sudo apt-get update && sudo apt-get install -y ansible
               cd ansible
               ansible-playbook -i inventory.ini --syntax-check playbook.yml
-            displayName: "Checagem de Sintaxe do Ansible"
+            displayName: "Validar sintaxe do Ansible"
 
-  # ============================================================================
-  # ESTÁGIO 2: CD - Deploy em DEV (Trigger na branch 'dev')
-  # ============================================================================
-  - stage: Deploy_DEV
-    displayName: "CD - Deploy em DEV"
-    dependsOn: CI
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
-    variables:
-      - group: vg-testekorp-dev
-    jobs:
-      - deployment: DeployDevJob
-        displayName: "Deploy Hospedado (DEV)"
-        pool:
-          vmImage: 'ubuntu-latest'
-        environment: 'dev'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                - script: |
-                    echo "======================================================================"
-                    echo "Instalando Ansible e provisionando ambiente DEV via Playbook..."
-                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
-                    echo "======================================================================"
-                    sudo apt-get update && sudo apt-get install -y ansible
-                    cd ansible
-                    ansible-playbook -i inventory.ini playbook.yml
-                  displayName: "Executar Provisionamento Ansible (DEV)"
-                - script: |
-                    echo "==> Validando endpoint em DEV..."
-                    sleep 3
-                    curl -s -i http://localhost/projeto-korp
-                  displayName: "Smoke Test HTTP (DEV)"
+          # 4. Publicar artefato 'drop' para ser consumido pelas Releases
+          - task: CopyFiles@2
+            displayName: "Copiar arquivos do projeto para o artefato"
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: |
+                app/**
+                nginx/**
+                monitoring/**
+                ansible/**
+                docker-compose.yml
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-  # ============================================================================
-  # ESTÁGIO 3: CD - Deploy em HOMOLOG (Trigger na branch 'homolog')
-  # ============================================================================
-  - stage: Deploy_HOMOLOG
-    displayName: "CD - Deploy em HOMOLOG"
-    dependsOn: CI
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/homolog'))
-    variables:
-      - group: vg-testekorp-homolog
-    jobs:
-      - deployment: DeployHomologJob
-        displayName: "Deploy Hospedado (HOMOLOG)"
-        pool:
-          vmImage: 'ubuntu-latest'
-        environment: 'homolog'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                - script: |
-                    echo "======================================================================"
-                    echo "Instalando Ansible e provisionando ambiente HOMOLOG via Playbook..."
-                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
-                    echo "======================================================================"
-                    sudo apt-get update && sudo apt-get install -y ansible
-                    cd ansible
-                    ansible-playbook -i inventory.ini playbook.yml
-                  displayName: "Executar Provisionamento Ansible (HOMOLOG)"
-                - script: |
-                    echo "==> Validando endpoint em HOMOLOG..."
-                    sleep 3
-                    curl -s -i http://localhost/projeto-korp
-                  displayName: "Smoke Test HTTP (HOMOLOG)"
-
-  # ============================================================================
-  # ESTÁGIO 4: CD - Deploy em PROD (Trigger na branch 'main')
-  # ============================================================================
-  - stage: Deploy_PROD
-    displayName: "CD - Deploy em PRODUÇÃO"
-    dependsOn: CI
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    variables:
-      - group: vg-testekorp-prod
-    jobs:
-      - deployment: DeployProdJob
-        displayName: "Deploy Hospedado (PRODUÇÃO)"
-        pool:
-          vmImage: 'ubuntu-latest'
-        environment: 'prod'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                - script: |
-                    echo "======================================================================"
-                    echo "Instalando Ansible e provisionando ambiente de PRODUÇÃO via Playbook..."
-                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
-                    echo "======================================================================"
-                    sudo apt-get update && sudo apt-get install -y ansible
-                    cd ansible
-                    ansible-playbook -i inventory.ini playbook.yml
-                  displayName: "Executar Provisionamento Ansible (PROD)"
-                - script: |
-                    echo "==> Validando endpoint em PRODUÇÃO..."
-                    sleep 3
-                    curl -s -i http://localhost/projeto-korp
-                  displayName: "Smoke Test HTTP (PROD)"
+          - task: PublishBuildArtifacts@1
+            displayName: "Publicar Artefato de Build (drop)"
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
