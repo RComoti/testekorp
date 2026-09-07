@@ -1,7 +1,7 @@
 ---
 - name: Provisionamento Completo do Ambiente - Desafio DevOps Korp
   hosts: korp_servers
-  become: true
+  become: false
   gather_facts: true
 
   vars:
@@ -21,6 +21,7 @@
       changed_when: false
 
     - name: Instalação do Docker em distribuições baseadas em Debian/Ubuntu
+      become: true
       when: docker_check.rc != 0 and ansible_os_family == 'Debian'
       block:
         - name: Atualizar cache do apt
@@ -68,11 +69,12 @@
             update_cache: yes
 
     - name: Garantir que o serviço do Docker esteja ativo e habilitado no boot
+      become: true
       service:
         name: docker
         state: started
         enabled: yes
-      when: ansible_service_mgr == 'systemd'
+      when: docker_check.rc != 0 and ansible_service_mgr == 'systemd'
 
     # =========================================================================
     # 2. Preparação do Diretório de Execução
