@@ -68,7 +68,7 @@ services:
     restart: unless-stopped
 
 networks:
-  # Rede Docker no modo bridge compartilhada entre todos os serviços
+  # Rede Docker no modo bridge compartilhada entre todos os serviços (criada previamente pelo Ansible)
   korp-bridge-net:
-    driver: bridge
     name: korp-bridge-network
+    external: true
