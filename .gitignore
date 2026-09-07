@@ -1,0 +1,26 @@
+# Binários e builds locais do Go
+app/http-server-projeto-korp
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Logs do sistema e containers
+*.log
+*.log.*
+
+# Arquivos de estado e retry do Ansible
+*.retry
+.ansible/
+
+# IDEs e editores
+.idea/
+.vscode/
+*.swp
+*~
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+ehthumbs.db

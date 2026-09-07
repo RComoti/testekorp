@@ -1,0 +1,74 @@
+services:
+  # Container 1: Serviço HTTP em Golang (com instrumentação Prometheus)
+  http-server-projeto-korp:
+    container_name: http-server-projeto-korp
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: http-server-projeto-korp:latest
+    networks:
+      - korp-bridge-net
+    # A porta NÃO é mapeada para o host (isolamento de rede), apenas exposta internamente
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  # Container 2: Nginx Proxy Reverso
+  nginx:
+    container_name: nginx-proxy
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - korp-bridge-net
+    depends_on:
+      - http-server-projeto-korp
+    restart: unless-stopped
+
+  # Container 3: Prometheus (Coleta de Métricas)
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - korp-bridge-net
+    depends_on:
+      - http-server-projeto-korp
+    restart: unless-stopped
+
+  # Container 4: Grafana (Visualização e Dashboard Provisionado)
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - korp-bridge-net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+networks:
+  # Rede Docker no modo bridge compartilhada entre todos os serviços
+  korp-bridge-net:
+    driver: bridge
+    name: korp-bridge-network

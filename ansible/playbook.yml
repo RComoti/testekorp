@@ -1,0 +1,146 @@
+---
+- name: Provisionamento Completo do Ambiente - Desafio DevOps Korp
+  hosts: korp_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    project_root: "{{ playbook_dir }}/.."
+    remote_workdir: "/opt/testeKorp"
+    docker_network_name: "korp-bridge-network"
+    target_endpoint: "http://localhost/projeto-korp"
+
+  tasks:
+    # =========================================================================
+    # 1. Instalação e Configuração do Docker em Ambiente Linux
+    # =========================================================================
+    - name: Verificar se o Docker já está instalado
+      command: docker --version
+      register: docker_check
+      failed_when: false
+      changed_when: false
+
+    - name: Instalação do Docker em distribuições baseadas em Debian/Ubuntu
+      when: docker_check.rc != 0 and ansible_os_family == 'Debian'
+      block:
+        - name: Atualizar cache do apt
+          apt:
+            update_cache: yes
+            cache_valid_time: 3600
+
+        - name: Instalar pré-requisitos para repositório Docker
+          apt:
+            name:
+              - apt-transport-https
+              - ca-certificates
+              - curl
+              - gnupg
+              - lsb-release
+            state: present
+
+        - name: Criar diretório para chaves GPG do apt
+          file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Adicionar chave GPG oficial do Docker
+          get_url:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            dest: /etc/apt/keyrings/docker.asc
+            mode: '0644'
+
+        - name: Adicionar repositório oficial do Docker
+          apt_repository:
+            repo: "deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state: present
+            filename: docker
+
+        - name: Instalar Docker CE, CLI e Docker Compose Plugin
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+            update_cache: yes
+
+    - name: Garantir que o serviço do Docker esteja ativo e habilitado no boot
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: ansible_service_mgr == 'systemd'
+
+    # =========================================================================
+    # 2. Preparação do Diretório de Execução
+    # =========================================================================
+    - name: Determinar diretório de trabalho do projeto
+      set_fact:
+        workdir: "{{ project_root if (ansible_connection == 'local' or inventory_hostname in ['localhost', '127.0.0.1']) else remote_workdir }}"
+
+    - name: Copiar arquivos do projeto para o host remoto (se não for localhost)
+      copy:
+        src: "{{ project_root }}/"
+        dest: "{{ remote_workdir }}"
+        mode: '0755'
+      when: ansible_connection != 'local' and inventory_hostname not in ['localhost', '127.0.0.1']
+
+    # =========================================================================
+    # 3. Criação da Rede Docker (Modo Bridge)
+    # =========================================================================
+    - name: Criar rede Docker no modo bridge
+      command: docker network create --driver bridge {{ docker_network_name }}
+      register: create_net
+      failed_when: create_net.rc != 0 and 'already exists' not in create_net.stderr
+      changed_when: create_net.rc == 0
+
+    # =========================================================================
+    # 4. Build da Imagem do Serviço http-server-projeto-korp
+    # =========================================================================
+    - name: Compilar e construir a imagem do serviço http-server-projeto-korp
+      command: docker compose build http-server-projeto-korp
+      args:
+        chdir: "{{ workdir }}"
+      register: build_output
+      changed_when: "'Built' in build_output.stdout or 'naming to' in build_output.stdout"
+
+    # =========================================================================
+    # 5. Execução dos Containers com Docker Compose
+    # =========================================================================
+    - name: Subir todos os containers da stack (Go App, NGINX, Prometheus, Grafana)
+      command: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ workdir }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stdout or 'Recreated' in compose_up.stdout or 'Created' in compose_up.stdout"
+
+    # =========================================================================
+    # 6. Validação do Serviço e Exibição no Console
+    # =========================================================================
+    - name: Aguardar o serviço ficar disponível na porta 80 via NGINX
+      uri:
+        url: "{{ target_endpoint }}"
+        method: GET
+        status_code: 200
+        return_content: yes
+      register: http_response
+      until: http_response.status == 200
+      retries: 15
+      delay: 2
+
+    - name: Exibir no console a resposta do serviço obtida via NGINX
+      debug:
+        msg:
+          - "======================================================================"
+          - "   PROVISIONAMENTO CONCLUÍDO COM SUCESSO - PROJETO KORP               "
+          - "======================================================================"
+          - "Status HTTP: {{ http_response.status }}"
+          - "Payload Retornado: {{ http_response.json }}"
+          - "======================================================================"
+          - "Serviço HTTP via NGINX : http://localhost/projeto-korp"
+          - "Métricas Prometheus    : http://localhost:9090"
+          - "Dashboard Grafana      : http://localhost:3000"
+          - "======================================================================"
