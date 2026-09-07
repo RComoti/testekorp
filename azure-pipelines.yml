@@ -1,39 +1,36 @@
 # ==============================================================================
-# Pipeline CI/CD - Desafio DevOps Korp (Azure Pipelines)
+# Pipeline CI/CD Multi-Ambiente - Desafio DevOps Korp
 # ==============================================================================
-# Esta pipeline é dividida em dois estágios:
-# 1. CI (Continuous Integration): Roda em agente gerenciado da Microsoft (ubuntu-latest)
-#    - Executa os testes unitários da aplicação em Golang
-#    - Valida a sintaxe do Playbook Ansible
-# 2. CD (Continuous Deployment): Roda no Self-Hosted Agent no notebook local
-#    - Executa o Playbook Ansible para provisionar o ambiente de ponta a ponta
-#    - Executa o teste de validação HTTP e exibe a resposta no log da pipeline
+# Segue o fluxo GitFlow:
+#  - Branch 'dev'     --> CI + Deploy Automático em ambiente DEV
+#  - Branch 'homolog' --> CI + Deploy Automático em ambiente HOMOLOG
+#  - Branch 'main'    --> CI + Deploy Automático em ambiente PROD
+#
+# Utiliza a pool de agentes auto-hospedados (Self-Hosted): TesteKorp-AgentPool
+# Utiliza as bibliotecas seguras (Variable Groups): vg-testekorp-dev, vg-testekorp-homolog, vg-testekorp-prod
 # ==============================================================================
 
 trigger:
   branches:
     include:
+      - dev
+      - homolog
       - main
-
-variables:
-  # Nome da pool onde o seu Agente Auto-hospedado (Notebook) está registrado
-  # Pode ser alterado para 'Default' caso utilize a pool padrão do Azure DevOps
-  agentPoolLocal: 'Local-Notebook'
 
 stages:
   # ============================================================================
-  # ESTÁGIO 1: CI - Testes Automatizados e Linting
+  # ESTÁGIO 1: CI (Continuous Integration) - Validação e Testes Unitários
   # ============================================================================
   - stage: CI
-    displayName: "CI - Integração Contínua"
+    displayName: "CI - Build & Testes Unitários"
     jobs:
-      - job: BuildAndTest
-        displayName: "Testes Unitários & Validação de Sintaxe"
+      - job: TestAndLint
+        displayName: "Testes Unitários em Go e Sintaxe Ansible"
         pool:
           vmImage: 'ubuntu-latest'
         steps:
           - task: GoTool@0
-            displayName: "Instalar Golang 1.22"
+            displayName: "Configurar Go 1.22"
             inputs:
               version: '1.22'
 
@@ -44,37 +41,110 @@ stages:
             displayName: "Executar testes unitários (Go)"
 
           - script: |
-              echo "==> Instalando Ansible para syntax check..."
+              echo "==> Validando sintaxe do Playbook Ansible..."
               sudo apt-get update && sudo apt-get install -y ansible
               cd ansible
               ansible-playbook -i inventory.ini --syntax-check playbook.yml
-            displayName: "Validar sintaxe do Playbook Ansible"
+            displayName: "Checagem de Sintaxe do Ansible"
 
   # ============================================================================
-  # ESTÁGIO 2: CD - Provisionamento Automatizado no Notebook Local
+  # ESTÁGIO 2: CD - Deploy em DEV (Trigger na branch 'dev')
   # ============================================================================
-  - stage: CD
-    displayName: "CD - Deploy no Notebook (Self-Hosted Agent)"
+  - stage: Deploy_DEV
+    displayName: "CD - Deploy em DEV"
     dependsOn: CI
-    condition: succeeded()
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+    variables:
+      - group: vg-testekorp-dev
     jobs:
-      - job: ProvisionLocal
-        displayName: "Provisionamento do Ambiente via Ansible"
+      - deployment: DeployDevJob
+        displayName: "Deploy no Notebook (DEV)"
         pool:
-          name: $(agentPoolLocal)
-        steps:
-          - script: |
-              echo "======================================================================"
-              echo "Iniciando provisionamento automatizado no notebook via Ansible..."
-              echo "======================================================================"
-              cd ansible
-              ansible-playbook -i inventory.ini playbook.yml
-            displayName: "Executar Playbook Ansible"
+          name: 'TesteKorp-AgentPool'
+        environment: 'dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: |
+                    echo "======================================================================"
+                    echo "Provisionando ambiente DEV no notebook via Ansible..."
+                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
+                    echo "======================================================================"
+                    cd ansible
+                    ansible-playbook -i inventory.ini playbook.yml
+                  displayName: "Executar Provisionamento Ansible (DEV)"
+                - script: |
+                    echo "==> Validando endpoint em DEV..."
+                    sleep 3
+                    curl -s -i http://localhost/projeto-korp
+                  displayName: "Smoke Test HTTP (DEV)"
 
-          - script: |
-              echo "======================================================================"
-              echo "Validando endpoint HTTP via Proxy NGINX..."
-              echo "======================================================================"
-              sleep 3
-              curl -s -i http://localhost/projeto-korp
-            displayName: "Smoke Test (GET /projeto-korp)"
+  # ============================================================================
+  # ESTÁGIO 3: CD - Deploy em HOMOLOG (Trigger na branch 'homolog')
+  # ============================================================================
+  - stage: Deploy_HOMOLOG
+    displayName: "CD - Deploy em HOMOLOG"
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/homolog'))
+    variables:
+      - group: vg-testekorp-homolog
+    jobs:
+      - deployment: DeployHomologJob
+        displayName: "Deploy no Notebook (HOMOLOG)"
+        pool:
+          name: 'TesteKorp-AgentPool'
+        environment: 'homolog'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: |
+                    echo "======================================================================"
+                    echo "Provisionando ambiente HOMOLOG no notebook via Ansible..."
+                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
+                    echo "======================================================================"
+                    cd ansible
+                    ansible-playbook -i inventory.ini playbook.yml
+                  displayName: "Executar Provisionamento Ansible (HOMOLOG)"
+                - script: |
+                    echo "==> Validando endpoint em HOMOLOG..."
+                    sleep 3
+                    curl -s -i http://localhost/projeto-korp
+                  displayName: "Smoke Test HTTP (HOMOLOG)"
+
+  # ============================================================================
+  # ESTÁGIO 4: CD - Deploy em PROD (Trigger na branch 'main')
+  # ============================================================================
+  - stage: Deploy_PROD
+    displayName: "CD - Deploy em PRODUÇÃO"
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    variables:
+      - group: vg-testekorp-prod
+    jobs:
+      - deployment: DeployProdJob
+        displayName: "Deploy no Notebook (PRODUÇÃO)"
+        pool:
+          name: 'TesteKorp-AgentPool'
+        environment: 'prod'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: |
+                    echo "======================================================================"
+                    echo "Provisionando ambiente de PRODUÇÃO no notebook via Ansible..."
+                    echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
+                    echo "======================================================================"
+                    cd ansible
+                    ansible-playbook -i inventory.ini playbook.yml
+                  displayName: "Executar Provisionamento Ansible (PROD)"
+                - script: |
+                    echo "==> Validando endpoint em PRODUÇÃO..."
+                    sleep 3
+                    curl -s -i http://localhost/projeto-korp
+                  displayName: "Smoke Test HTTP (PROD)"
