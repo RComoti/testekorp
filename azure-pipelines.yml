@@ -6,7 +6,7 @@
 #  - Branch 'homolog' --> CI + Deploy Automático em ambiente HOMOLOG
 #  - Branch 'main'    --> CI + Deploy Automático em ambiente PROD
 #
-# Utiliza a pool de agentes auto-hospedados (Self-Hosted): TesteKorp-AgentPool
+# Utiliza Agent Pool hospedado da Microsoft: 'Azure Pipelines' (vmImage: 'ubuntu-latest')
 # Utiliza as bibliotecas seguras (Variable Groups): vg-testekorp-dev, vg-testekorp-homolog, vg-testekorp-prod
 # ==============================================================================
 
@@ -35,8 +35,9 @@ stages:
               version: '1.22'
 
           - script: |
-              echo "==> Executando testes unitários em Go..."
+              echo "==> Baixando dependências e executando testes unitários em Go..."
               cd app
+              go mod download
               go test -v ./...
             displayName: "Executar testes unitários (Go)"
 
@@ -58,9 +59,9 @@ stages:
       - group: vg-testekorp-dev
     jobs:
       - deployment: DeployDevJob
-        displayName: "Deploy no Notebook (DEV)"
+        displayName: "Deploy Hospedado (DEV)"
         pool:
-          name: 'TesteKorp-AgentPool'
+          vmImage: 'ubuntu-latest'
         environment: 'dev'
         strategy:
           runOnce:
@@ -69,9 +70,10 @@ stages:
                 - checkout: self
                 - script: |
                     echo "======================================================================"
-                    echo "Provisionando ambiente DEV no notebook via Ansible..."
+                    echo "Instalando Ansible e provisionando ambiente DEV via Playbook..."
                     echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
                     echo "======================================================================"
+                    sudo apt-get update && sudo apt-get install -y ansible
                     cd ansible
                     ansible-playbook -i inventory.ini playbook.yml
                   displayName: "Executar Provisionamento Ansible (DEV)"
@@ -92,9 +94,9 @@ stages:
       - group: vg-testekorp-homolog
     jobs:
       - deployment: DeployHomologJob
-        displayName: "Deploy no Notebook (HOMOLOG)"
+        displayName: "Deploy Hospedado (HOMOLOG)"
         pool:
-          name: 'TesteKorp-AgentPool'
+          vmImage: 'ubuntu-latest'
         environment: 'homolog'
         strategy:
           runOnce:
@@ -103,9 +105,10 @@ stages:
                 - checkout: self
                 - script: |
                     echo "======================================================================"
-                    echo "Provisionando ambiente HOMOLOG no notebook via Ansible..."
+                    echo "Instalando Ansible e provisionando ambiente HOMOLOG via Playbook..."
                     echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
                     echo "======================================================================"
+                    sudo apt-get update && sudo apt-get install -y ansible
                     cd ansible
                     ansible-playbook -i inventory.ini playbook.yml
                   displayName: "Executar Provisionamento Ansible (HOMOLOG)"
@@ -126,9 +129,9 @@ stages:
       - group: vg-testekorp-prod
     jobs:
       - deployment: DeployProdJob
-        displayName: "Deploy no Notebook (PRODUÇÃO)"
+        displayName: "Deploy Hospedado (PRODUÇÃO)"
         pool:
-          name: 'TesteKorp-AgentPool'
+          vmImage: 'ubuntu-latest'
         environment: 'prod'
         strategy:
           runOnce:
@@ -137,9 +140,10 @@ stages:
                 - checkout: self
                 - script: |
                     echo "======================================================================"
-                    echo "Provisionando ambiente de PRODUÇÃO no notebook via Ansible..."
+                    echo "Instalando Ansible e provisionando ambiente de PRODUÇÃO via Playbook..."
                     echo "Ambiente: $(ENVIRONMENT) | Porta: $(SERVICE_PORT)"
                     echo "======================================================================"
+                    sudo apt-get update && sudo apt-get install -y ansible
                     cd ansible
                     ansible-playbook -i inventory.ini playbook.yml
                   displayName: "Executar Provisionamento Ansible (PROD)"
