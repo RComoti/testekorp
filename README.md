@@ -158,6 +158,21 @@ curl http://localhost:8080/projeto-korp
 
 ---
 
+## 🔄 Esteira CI/CD (Azure DevOps Pipelines)
+
+Como diferencial técnico e bônus arquitetural, o projeto conta com uma esteira de **CI/CD no Azure Pipelines** ([`azure-pipelines.yml`](azure-pipelines.yml)) integrada ao repositório:
+
+1. **Stage 1 (CI - Cloud)**: Executado em agentes Microsoft Hosted (`ubuntu-latest`):
+   - Execução dos testes unitários em Go (`go test -v ./...`).
+   - Validação estática e checagem de sintaxe do playbook Ansible (`ansible-playbook --syntax-check`).
+2. **Stage 2 (CD - Local Notebook)**: Executado via **Self-Hosted Agent** diretamente no notebook do desenvolvedor:
+   - Orquestra a execução do Playbook Ansible (`ansible-playbook -i inventory.ini playbook.yml`).
+   - Provisiona todos os containers e valida a resposta HTTP na porta 80 localmente.
+
+📖 *Para instruções detalhadas de configuração do agente e pipeline, consulte o guia:* [`docs/azure-devops-guide.md`](docs/azure-devops-guide.md).
+
+---
+
 ## 💡 Decisões Técnicas e Boas Práticas
 
 1. **Multi-Stage Build**: A imagem final da aplicação Go utiliza `alpine:3.20`, gerando uma imagem de aproximadamente 15MB, sem ferramentas desnecessárias em tempo de execução, reduzindo drasticamente a superfície de ataque (*attack surface*).

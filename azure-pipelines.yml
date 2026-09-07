@@ -1,0 +1,80 @@
+# ==============================================================================
+# Pipeline CI/CD - Desafio DevOps Korp (Azure Pipelines)
+# ==============================================================================
+# Esta pipeline é dividida em dois estágios:
+# 1. CI (Continuous Integration): Roda em agente gerenciado da Microsoft (ubuntu-latest)
+#    - Executa os testes unitários da aplicação em Golang
+#    - Valida a sintaxe do Playbook Ansible
+# 2. CD (Continuous Deployment): Roda no Self-Hosted Agent no notebook local
+#    - Executa o Playbook Ansible para provisionar o ambiente de ponta a ponta
+#    - Executa o teste de validação HTTP e exibe a resposta no log da pipeline
+# ==============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  # Nome da pool onde o seu Agente Auto-hospedado (Notebook) está registrado
+  # Pode ser alterado para 'Default' caso utilize a pool padrão do Azure DevOps
+  agentPoolLocal: 'Local-Notebook'
+
+stages:
+  # ============================================================================
+  # ESTÁGIO 1: CI - Testes Automatizados e Linting
+  # ============================================================================
+  - stage: CI
+    displayName: "CI - Integração Contínua"
+    jobs:
+      - job: BuildAndTest
+        displayName: "Testes Unitários & Validação de Sintaxe"
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            displayName: "Instalar Golang 1.22"
+            inputs:
+              version: '1.22'
+
+          - script: |
+              echo "==> Executando testes unitários em Go..."
+              cd app
+              go test -v ./...
+            displayName: "Executar testes unitários (Go)"
+
+          - script: |
+              echo "==> Instalando Ansible para syntax check..."
+              sudo apt-get update && sudo apt-get install -y ansible
+              cd ansible
+              ansible-playbook -i inventory.ini --syntax-check playbook.yml
+            displayName: "Validar sintaxe do Playbook Ansible"
+
+  # ============================================================================
+  # ESTÁGIO 2: CD - Provisionamento Automatizado no Notebook Local
+  # ============================================================================
+  - stage: CD
+    displayName: "CD - Deploy no Notebook (Self-Hosted Agent)"
+    dependsOn: CI
+    condition: succeeded()
+    jobs:
+      - job: ProvisionLocal
+        displayName: "Provisionamento do Ambiente via Ansible"
+        pool:
+          name: $(agentPoolLocal)
+        steps:
+          - script: |
+              echo "======================================================================"
+              echo "Iniciando provisionamento automatizado no notebook via Ansible..."
+              echo "======================================================================"
+              cd ansible
+              ansible-playbook -i inventory.ini playbook.yml
+            displayName: "Executar Playbook Ansible"
+
+          - script: |
+              echo "======================================================================"
+              echo "Validando endpoint HTTP via Proxy NGINX..."
+              echo "======================================================================"
+              sleep 3
+              curl -s -i http://localhost/projeto-korp
+            displayName: "Smoke Test (GET /projeto-korp)"
