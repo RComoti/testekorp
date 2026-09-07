@@ -6,6 +6,8 @@ services:
       context: ./app
       dockerfile: Dockerfile
     image: http-server-projeto-korp:latest
+    environment:
+      - TZ=America/Sao_Paulo
     networks:
       - korp-bridge-net
     # A porta NÃO é mapeada para o host (isolamento de rede), apenas exposta internamente

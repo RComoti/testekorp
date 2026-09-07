@@ -10,11 +10,24 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// Fuso horário do Brasil (America/Sao_Paulo, GMT-3 / UTC-3)
+var brazilLocation *time.Location
+
+func init() {
+	var err error
+	brazilLocation, err = time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		// Fallback para fuso horário fixo UTC-3 (Horário de Brasília / São Paulo)
+		brazilLocation = time.FixedZone("America/Sao_Paulo", -3*60*60)
+	}
+}
 
 // ResponsePayload representa a estrutura de resposta exigida pelo desafio
 type ResponsePayload struct {
@@ -84,7 +97,7 @@ func projetoKorpHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := ResponsePayload{
 		Nome:    "Projeto Korp",
-		Horario: time.Now().UTC().Format(time.RFC3339),
+		Horario: time.Now().In(brazilLocation).Format(time.RFC3339),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
