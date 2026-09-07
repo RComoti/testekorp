@@ -158,18 +158,22 @@ curl http://localhost:8080/projeto-korp
 
 ---
 
-## 🔄 Esteira CI/CD (Azure DevOps Pipelines)
+## 🔄 Esteira CI/CD Desacoplada (Azure DevOps Pipelines & Releases)
 
-Como diferencial técnico e bônus arquitetural, o projeto conta com uma esteira de **CI/CD no Azure Pipelines** ([`azure-pipelines.yml`](azure-pipelines.yml)) integrada ao repositório:
+Como diferencial técnico sênior, o projeto conta com uma arquitetura desacoplada de **CI/CD no Azure DevOps** integrada ao fluxo GitFlow:
 
-1. **Stage 1 (CI - Cloud)**: Executado em agentes Microsoft Hosted (`ubuntu-latest`):
+1. **Azure Pipelines (CI / Build)** ([`azure-pipelines.yml`](azure-pipelines.yml)):
+   - Executado em agentes hospedados da Microsoft (`ubuntu-latest`).
+   - Gatilhos automáticos a cada novo commit nas branches **`dev`**, **`homolog`** e **`main`**.
    - Execução dos testes unitários em Go (`go test -v ./...`).
-   - Validação estática e checagem de sintaxe do playbook Ansible (`ansible-playbook --syntax-check`).
-2. **Stage 2 (CD - Local Notebook)**: Executado via **Self-Hosted Agent** diretamente no notebook do desenvolvedor:
-   - Orquestra a execução do Playbook Ansible (`ansible-playbook -i inventory.ini playbook.yml`).
-   - Provisiona todos os containers e valida a resposta HTTP na porta 80 localmente.
+   - Validação estática de sintaxe do Ansible (`ansible-playbook --syntax-check`).
+   - Empacotamento e publicação do artefato versionado **`drop`**.
+2. **Azure Releases (CD / Deploy)**:
+   - Definição de Release **`TesteKorp-CD-Release`** com estágios para **`DEV`**, **`HOMOLOG`** e **`PROD`**.
+   - *Continuous Deployment trigger* ativado para criar releases automáticas a cada build concluído.
+   - Variáveis de ambiente e credenciais protegidas via **Variable Groups** na Library (`vg-testekorp-dev`, `vg-testekorp-homolog`, `vg-testekorp-prod`).
 
-📖 *Para instruções detalhadas de configuração do agente e pipeline, consulte o guia:* [`docs/azure-devops-guide.md`](docs/azure-devops-guide.md).
+📖 *Para detalhes completos da arquitetura e configuração, consulte o guia:* [`docs/azure-devops-guide.md`](docs/azure-devops-guide.md).
 
 ---
 
