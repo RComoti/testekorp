@@ -56,38 +56,19 @@ flowchart TD
 
 ## 🚀 Como Executar o Projeto
 
-### Opção 1: Provisionamento com 1 Único Comando via Ansible (Requisito Principal)
-
-Para provisionar todo o ambiente automaticamente em ambiente Linux (ou WSL2):
+Conforme especificado no desafio técnico, todo o provisionamento, criação da rede, build, subida dos containers e testes são executados através de **um único comando via Ansible**:
 
 ```bash
 cd ansible
 ansible-playbook -i inventory.ini playbook.yml
 ```
 
-O Ansible executará:
-1. Validação/Instalação do Docker e Compose Plugin.
-2. Criação da rede Docker bridge.
-3. Build da imagem da aplicação Go com testes unitários automáticos.
-4. Execução coordenada dos 4 containers via Docker Compose.
-5. Validação HTTP do endpoint via NGINX e exibição do JSON no console.
-
----
-
-### Opção 2: Execução Direta via Docker Compose
-
-Caso prefira subir diretamente via Docker (sem utilizar o Ansible):
-
-```bash
-# Criar a rede Docker bridge (exigência do isolamento)
-docker network create --driver bridge korp-bridge-network
-
-# Subir toda a stack e compilar imagens
-docker compose up -d --build
-
-# Verificar containers em execução
-docker compose ps
-```
+### O que o Ansible executa automaticamente:
+1. **Verificação do Ambiente**: Checa a presença do Docker e Compose.
+2. **Criação da Rede Docker**: Cria previamente a rede `korp-bridge-network` no modo bridge.
+3. **Build da Aplicação**: Compila a imagem enxuta em Go com execução dos testes unitários.
+4. **Deploy dos Containers**: Executa o `docker compose up -d` conectando os 4 containers (Go App, NGINX, Prometheus e Grafana) à rede criada.
+5. **Teste de Fumaça & Validação**: Realiza a chamada HTTP `GET /projeto-korp` via NGINX na porta 80 e imprime o JSON retornado no console.
 
 ---
 
