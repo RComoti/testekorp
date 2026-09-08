@@ -2,7 +2,7 @@
 # Pipeline de CI (Build & Validação) - Desafio DevOps Korp
 # ==============================================================================
 # Escopo: Apenas Integração Contínua (CI)
-# O deploy (CD) é gerenciado pelas definições de Release no Azure DevOps.
+# O deploy (CD) é gerenciado pelas definições de Release no Azure DevOps (Ansible-driven com set -e).
 #
 # Gatilhos automáticos nas branches do GitFlow: dev, homolog e main.
 # Agente: Microsoft-hosted (ubuntu-latest).
