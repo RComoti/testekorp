@@ -67,11 +67,14 @@ flowchart LR
 
 ### Estágios / Ambientes Configurados:
 
-| Ambiente | Estágio na Release | Variable Group Vinculado | Descrição |
-| :--- | :--- | :--- | :--- |
-| **DEV** | `DEV` | `vg-testekorp-dev` | Deploy e testes no ambiente de desenvolvimento |
-| **HOMOLOG** | `HOMOLOG` | `vg-testekorp-homolog` | Deploy e validações pré-produção |
-| **PROD** | `PROD` | `vg-testekorp-prod` | Deploy final em produção |
+| Ambiente | Estágio na Release | Variable Group Vinculado | Agente de Execução | Descrição |
+| :--- | :--- | :--- | :--- | :--- |
+| **DEV** | `DEV` | `vg-testekorp-dev` | Self-Hosted (`$seu-notebook`) | Deploy e testes no ambiente de desenvolvimento |
+| **HOMOLOG** | `HOMOLOG` | `vg-testekorp-homolog` | Self-Hosted (`$seu-notebook`) | Deploy e validações pré-produção |
+| **PROD** | `PROD` | `vg-testekorp-prod` | Self-Hosted (`$seu-notebook`) | Deploy final em produção |
+
+- **Agent Pool Utilizado**: `TesteKorp-AgentPool`
+- **Nome do Agente**: `$seu-notebook` (Self-Hosted Runner local em Linux/WSL2 executando Docker e Ansible diretamente no host)
 
 ---
 
@@ -102,7 +105,8 @@ Seguindo as melhores práticas de DevSecOps, nenhuma credencial sensível fica n
 
 ## 4. Como Validar no Portal do Azure DevOps
 
-1. Acesse o projeto: [https://dev.azure.com/rcomoti/TesteKorp](https://dev.azure.com/rcomoti/TesteKorp)
+1. Acesse o projeto: `https://dev.azure.com/<sua-organizacao>/TesteKorp`
 2. **Pipelines de CI**: Vá em **Pipelines** > **Pipelines** para ver as execuções bem-sucedidas em `dev`, `homolog` e `main`.
 3. **Releases de CD**: Vá em **Pipelines** > **Releases** para visualizar o pipeline de release com os estágios `DEV`, `HOMOLOG` e `PROD`.
 4. **Library**: Vá em **Pipelines** > **Library** para verificar os Variable Groups protegidos.
+5. **Agent Pools**: Vá em **Project Settings** > **Agent pools** > **TesteKorp-AgentPool** para verificar o agente `$seu-notebook` online.

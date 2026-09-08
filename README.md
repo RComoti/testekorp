@@ -76,9 +76,12 @@ O Ansible executará:
 
 ### Opção 2: Execução Direta via Docker Compose
 
-Caso prefira subir diretamente via Docker:
+Caso prefira subir diretamente via Docker (sem utilizar o Ansible):
 
 ```bash
+# Criar a rede Docker bridge (exigência do isolamento)
+docker network create --driver bridge korp-bridge-network
+
 # Subir toda a stack e compilar imagens
 docker compose up -d --build
 
@@ -98,7 +101,7 @@ curl http://localhost:80/projeto-korp
 ```json
 {
   "nome": "Projeto Korp",
-  "horario": "2026-09-07T14:50:42Z"
+  "horario": "2026-09-08T10:00:00-03:00"
 }
 ```
 
