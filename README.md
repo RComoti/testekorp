@@ -156,6 +156,9 @@ Como diferencial técnico sênior, o projeto conta com uma arquitetura desacopla
    - Definição de Release **`TesteKorp-CD-Release`** com estágios para **`DEV`**, **`HOMOLOG`** e **`PROD`**.
    - *Continuous Deployment trigger* ativado para criar releases automáticas a cada build concluído.
    - Variáveis de ambiente e credenciais protegidas via **Variable Groups** na Library (`vg-testekorp-dev`, `vg-testekorp-homolog`, `vg-testekorp-prod`).
+3. **Azure Releases (CD / Teardown & Destroy)**:
+   - Definição de Release **`TesteKorp-CD-Release-Destroy`** com estágios para **`DEV`**, **`HOMOLOG`** e **`PROD`**.
+   - Acionamento **100% manual (sob demanda)** para desprovisionamento e limpeza completa da stack no agente.
 
 📖 *Para detalhes completos da arquitetura e configuração, consulte o guia:* [`docs/azure-devops-guide.md`](docs/azure-devops-guide.md).
 

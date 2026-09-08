@@ -78,7 +78,23 @@ flowchart LR
 
 ---
 
-## 3. Gerenciamento de Segredos e Variáveis (Library)
+## 3. Definição de Desprovisionamento e Destruição (CD / Teardown)
+
+- **Localização**: Menu lateral **Pipelines** > **Releases** > **`TesteKorp-CD-Release-Destroy`**.
+- **Objetivo**: Gestão do ciclo de vida da infraestrutura (desprovisionamento e limpeza completa sob demanda).
+- **Gatilho de Execução**: **100% Manual (On-Demand)** — sem gatilhos automáticos para proteção e segurança contra exclusões acidentais.
+- **Estágios Disponíveis**: `DEV`, `HOMOLOG` e `PROD`.
+- **Ação Executada no Agente (`$seu-notebook`)**:
+  ```bash
+  cd $(System.DefaultWorkingDirectory)/_TesteKorp-CI-CD/drop
+  docker compose down -v --rmi all
+  docker network rm korp-bridge-network || true
+  ```
+- **Resultado**: Remove todos os containers, volumes, redes e imagens de forma segura e idempotente em um único clique.
+
+---
+
+## 4. Gerenciamento de Segredos e Variáveis (Library)
 
 Seguindo as melhores práticas de DevSecOps, nenhuma credencial sensível fica no código-fonte. Todas estão centralizadas em **Pipelines** > **Library**:
 
@@ -103,7 +119,7 @@ Seguindo as melhores práticas de DevSecOps, nenhuma credencial sensível fica n
 
 ---
 
-## 4. Como Validar no Portal do Azure DevOps
+## 5. Como Validar no Portal do Azure DevOps
 
 1. Acesse o projeto: `https://dev.azure.com/<sua-organizacao>/TesteKorp`
 2. **Pipelines de CI**: Vá em **Pipelines** > **Pipelines** para ver as execuções bem-sucedidas em `dev`, `homolog` e `main`.
